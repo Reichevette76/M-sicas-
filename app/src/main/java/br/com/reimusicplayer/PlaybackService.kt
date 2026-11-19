@@ -22,7 +22,7 @@ class PlaybackService : MediaLibraryService() {
             session: MediaLibrarySession,
             browser: MediaSession.ControllerInfo,
             params: LibraryParams?
-        ): ListenableFuture<LibraryResult<MediaItem>> {
+        ): ListenableFuture<MediaLibraryService.LibraryResult<MediaItem>> {
 
             val root = MediaItem.Builder()
                 .setMediaId(AudioLibrary.ROOT_ID)
@@ -36,7 +36,7 @@ class PlaybackService : MediaLibraryService() {
                 .build()
 
             return Futures.immediateFuture(
-                LibraryResult.ofItem(root, params)
+                MediaLibraryService.LibraryResult.ofItem(root, params)
             )
         }
 
@@ -47,7 +47,7 @@ class PlaybackService : MediaLibraryService() {
             page: Int,
             pageSize: Int,
             params: LibraryParams?
-        ): ListenableFuture<LibraryResult<ImmutableList<MediaItem>>> {
+        ): ListenableFuture<MediaLibraryService.LibraryResult<ImmutableList<MediaItem>>> {
 
             val allTracks = if (parentId == AudioLibrary.ROOT_ID) {
                 AudioLibrary.load(this@PlaybackService)
@@ -60,7 +60,7 @@ class PlaybackService : MediaLibraryService() {
             val pageItems = ImmutableList.copyOf(allTracks.subList(start, end))
 
             return Futures.immediateFuture(
-                LibraryResult.ofItemList(pageItems, params)
+                MediaLibraryService.LibraryResult.ofItemList(pageItems, params)
             )
         }
     }
