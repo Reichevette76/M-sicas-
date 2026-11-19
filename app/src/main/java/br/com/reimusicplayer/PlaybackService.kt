@@ -4,6 +4,7 @@ import androidx.media3.common.MediaItem
 import androidx.media3.common.MediaMetadata
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.session.LibraryResult
 import androidx.media3.session.MediaLibraryService
 import androidx.media3.session.MediaSession
 import com.google.common.collect.ImmutableList
@@ -22,7 +23,7 @@ class PlaybackService : MediaLibraryService() {
             session: MediaLibrarySession,
             browser: MediaSession.ControllerInfo,
             params: LibraryParams?
-        ): ListenableFuture<MediaLibraryService.LibraryResult<MediaItem>> {
+        ): ListenableFuture<LibraryResult<MediaItem>> {
 
             val root = MediaItem.Builder()
                 .setMediaId(AudioLibrary.ROOT_ID)
@@ -36,7 +37,7 @@ class PlaybackService : MediaLibraryService() {
                 .build()
 
             return Futures.immediateFuture(
-                MediaLibraryService.LibraryResult.ofItem(root, params)
+                LibraryResult.ofItem(root, params)
             )
         }
 
@@ -47,7 +48,7 @@ class PlaybackService : MediaLibraryService() {
             page: Int,
             pageSize: Int,
             params: LibraryParams?
-        ): ListenableFuture<MediaLibraryService.LibraryResult<ImmutableList<MediaItem>>> {
+        ): ListenableFuture<LibraryResult<ImmutableList<MediaItem>>> {
 
             val allTracks = if (parentId == AudioLibrary.ROOT_ID) {
                 AudioLibrary.load(this@PlaybackService)
@@ -60,7 +61,7 @@ class PlaybackService : MediaLibraryService() {
             val pageItems = ImmutableList.copyOf(allTracks.subList(start, end))
 
             return Futures.immediateFuture(
-                MediaLibraryService.LibraryResult.ofItemList(pageItems, params)
+                LibraryResult.ofItemList(pageItems, params)
             )
         }
     }
