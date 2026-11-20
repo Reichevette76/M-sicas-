@@ -10,6 +10,8 @@
     <application
         android:allowBackup="true"
         android:label="Rei Music Player"
+        android:icon="@drawable/ic_rei_crown_headphones"
+        android:roundIcon="@drawable/ic_rei_crown_headphones"
         android:supportsRtl="true"
         android:theme="@style/AppTheme">
 
