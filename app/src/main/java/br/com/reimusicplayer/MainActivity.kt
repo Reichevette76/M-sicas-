@@ -1,19 +1,24 @@
 package br.com.reimusicplayer
 
 import android.Manifest
+import android.app.RecoverableSecurityException
 import android.content.ComponentName
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
+import android.provider.MediaStore
 import android.view.Gravity
 import android.view.View
 import android.widget.ArrayAdapter
 import android.widget.Button
+import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.ListView
 import android.widget.TextView
 import android.widget.Toast
+import androidx.activity.result.IntentSenderRequest
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import androidx.media3.common.MediaItem
@@ -24,7 +29,6 @@ import com.google.common.util.concurrent.ListenableFuture
 import com.google.common.util.concurrent.MoreExecutors
 
 class MainActivity : AppCompatActivity() {
-
     private lateinit var status: TextView
     private lateinit var currentTrack: TextView
     private lateinit var trackList: ListView
@@ -42,10 +46,28 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
+    private val audioPicker =
+        registerForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { uris ->
+            if (uris.isNotEmpty()) {
+                val imported = AudioLibrary.importFiles(this, uris)
+                Toast.makeText(this, imported.toString() + " música(s) adicionada(s).", Toast.LENGTH_LONG).show()
+                loadTracks()
+            }
+        }
+
+    private val deleteRequest =
+        registerForActivityResult(ActivityResultContracts.StartIntentSenderForResult()) { result ->
+            if (result.resultCode == RESULT_OK) {
+                Toast.makeText(this, "Música excluída.", Toast.LENGTH_SHORT).show()
+                loadTracks()
+            }
+        }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        window.statusBarColor = 0xFF080808.toInt()
+        window.navigationBarColor = 0xFF080808.toInt()
         buildScreen()
-
         if (hasAudioPermission()) {
             connectToPlayer()
             loadTracks()
@@ -60,7 +82,6 @@ class MainActivity : AppCompatActivity() {
             setPadding(dp(18), dp(14), dp(18), dp(12))
             setBackgroundColor(0xFF080808.toInt())
         }
-
         val brand = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER
@@ -72,7 +93,6 @@ class MainActivity : AppCompatActivity() {
             scaleType = ImageView.ScaleType.FIT_CENTER
         }
         brand.addView(crown, LinearLayout.LayoutParams(dp(68), dp(58)))
-
         val rei = TextView(this).apply {
             text = "REI"
             textSize = 34f
@@ -82,7 +102,6 @@ class MainActivity : AppCompatActivity() {
             letterSpacing = 0.12f
         }
         brand.addView(rei)
-
         val music = TextView(this).apply {
             text = "M U S I C"
             textSize = 13f
@@ -140,19 +159,13 @@ class MainActivity : AppCompatActivity() {
         root.addView(controls, LinearLayout.LayoutParams(-1, dp(64)))
 
         previous.setOnClickListener {
-            mediaController?.let { player ->
-                if (player.hasPreviousMediaItem()) player.seekToPreviousMediaItem()
-            }
+            mediaController?.let { player -> if (player.hasPreviousMediaItem()) player.seekToPreviousMediaItem() }
         }
         playPause.setOnClickListener {
-            mediaController?.let { player ->
-                if (player.isPlaying) player.pause() else player.play()
-            }
+            mediaController?.let { player -> if (player.isPlaying) player.pause() else player.play() }
         }
         next.setOnClickListener {
-            mediaController?.let { player ->
-                if (player.hasNextMediaItem()) player.seekToNextMediaItem()
-            }
+            mediaController?.let { player -> if (player.hasNextMediaItem()) player.seekToNextMediaItem() }
         }
 
         val libraryTitle = TextView(this).apply {
@@ -172,7 +185,6 @@ class MainActivity : AppCompatActivity() {
             cacheColorHint = 0xFF121212.toInt()
         }
         root.addView(trackList, LinearLayout.LayoutParams(-1, 0, 1f))
-
         trackList.setOnItemClickListener { _, _, position, _ ->
             if (tracks.isEmpty()) return@setOnItemClickListener
             mediaController?.let { player ->
@@ -182,23 +194,74 @@ class MainActivity : AppCompatActivity() {
                 currentTrack.text = tracks[position].mediaMetadata.title?.toString() ?: "Tocando música"
             } ?: Toast.makeText(this, "Conectando ao player...", Toast.LENGTH_SHORT).show()
         }
+        trackList.setOnItemLongClickListener { _, _, position, _ ->
+            confirmDeleteTrack(position)
+            true
+        }
+
+        val importButton = makeButton("ADICIONAR MÚSICAS")
+        importButton.setOnClickListener { audioPicker.launch(arrayOf("audio/*")) }
+        root.addView(importButton, LinearLayout.LayoutParams(-1, dp(46)).apply { topMargin = dp(8) })
 
         val refresh = makeButton("ATUALIZAR BIBLIOTECA")
         refresh.setOnClickListener { loadTracks() }
-        root.addView(refresh, LinearLayout.LayoutParams(-1, dp(48)).apply { topMargin = dp(10) })
-
+        root.addView(refresh, LinearLayout.LayoutParams(-1, dp(46)).apply { topMargin = dp(6) })
         setContentView(root)
     }
 
-    private fun makeButton(label: String): Button {
-        return Button(this).apply {
+    private fun confirmDeleteTrack(position: Int) {
+        val item = tracks.getOrNull(position) ?: return
+        val title = item.mediaMetadata.title?.toString() ?: "esta música"
+        AlertDialog.Builder(this)
+            .setTitle("Remover música")
+            .setMessage("Deseja excluir \"" + title + "\"? Para arquivos do celular, o Android pedirá confirmação.")
+            .setNegativeButton("Cancelar", null)
+            .setPositiveButton("Excluir") { _, _ -> deleteTrack(item) }
+            .show()
+    }
+
+    private fun deleteTrack(item: MediaItem) {
+        if (AudioLibrary.isImported(item)) {
+            if (AudioLibrary.deleteImported(this, item)) {
+                Toast.makeText(this, "Música removida da biblioteca.", Toast.LENGTH_SHORT).show()
+                loadTracks()
+            } else {
+                Toast.makeText(this, "Não foi possível remover a música.", Toast.LENGTH_SHORT).show()
+            }
+            return
+        }
+        val uri = item.localConfiguration?.uri ?: return
+        try {
+            if (Build.VERSION.SDK_INT >= 30) {
+                val request = MediaStore.createDeleteRequest(contentResolver, listOf(uri))
+                deleteRequest.launch(IntentSenderRequest.Builder(request.intentSender).build())
+            } else if (Build.VERSION.SDK_INT == 29) {
+                try {
+                    contentResolver.delete(uri, null, null)
+                    loadTracks()
+                } catch (error: RecoverableSecurityException) {
+                    val request = IntentSenderRequest.Builder(error.userAction.actionIntent.intentSender).build()
+                    deleteRequest.launch(request)
+                }
+            } else {
+                Toast.makeText(this, "Use o gerenciador de arquivos para excluir este arquivo.", Toast.LENGTH_LONG).show()
+            }
+        } catch (_: Exception) {
+            Toast.makeText(this, "O Android não permitiu excluir este arquivo.", Toast.LENGTH_LONG).show()
+        }
+    }
+
+    private fun makeButton(label: String): Button =
+        Button(this).apply {
             text = label
             textSize = 11f
             isAllCaps = false
             setTextColor(0xFFFFFFFF.toInt())
             backgroundTintList = android.content.res.ColorStateList.valueOf(0xFFD71920.toInt())
+            typeface = android.graphics.Typeface.DEFAULT_BOLD
+            minHeight = dp(44)
+            minimumHeight = dp(44)
         }
-    }
 
     private fun connectToPlayer() {
         if (controllerFuture != null) return
@@ -209,12 +272,12 @@ class MainActivity : AppCompatActivity() {
                 mediaController = controllerFuture?.get()
                 mediaController?.addListener(object : Player.Listener {
                     override fun onMediaMetadataChanged(mediaMetadata: androidx.media3.common.MediaMetadata) {
-                        currentTrack.text = mediaMetadata.title?.toString() ?: "Rei Music Player"
+                        currentTrack.text = mediaMetadata.title?.toString() ?: "REI MUSIC PLAYER"
                     }
                 })
-                status.text = "Player pronto para tocar offline."
-            } catch (error: Exception) {
-                status.text = "Não foi possível iniciar o player."
+                status.text = "PLAYER PRONTO • MODO OFFLINE"
+            } catch (_: Exception) {
+                status.text = "NÃO FOI POSSÍVEL INICIAR O PLAYER"
             }
         }, MoreExecutors.directExecutor())
     }
@@ -224,34 +287,28 @@ class MainActivity : AppCompatActivity() {
             permissionRequest.launch(audioPermission())
             return
         }
-
         tracks.clear()
         tracks.addAll(AudioLibrary.load(this))
-
         val names = tracks.map { item ->
             val song = item.mediaMetadata.title?.toString() ?: "Faixa sem título"
             val artist = item.mediaMetadata.artist?.toString() ?: "Artista desconhecido"
-            "$song\n$artist"
+            song + "\n" + artist
         }
-
-        val adapter = object : ArrayAdapter<String>(
-            this,
-            android.R.layout.simple_list_item_1,
-            names
-        ) {
+        val adapter = object : ArrayAdapter<String>(this, android.R.layout.simple_list_item_1, names) {
             override fun getView(position: Int, convertView: View?, parent: android.view.ViewGroup): View {
                 val view = super.getView(position, convertView, parent) as TextView
                 view.setTextColor(0xFFFFFFFF.toInt())
                 view.textSize = 14f
                 view.setPadding(dp(14), dp(12), dp(10), dp(12))
+                view.setBackgroundColor(0xFF121212.toInt())
                 return view
             }
         }
         trackList.adapter = adapter
         status.text = if (tracks.isEmpty()) {
-            "Nenhuma música encontrada. Coloque arquivos MP3 na pasta Música do celular."
+            "NENHUMA MÚSICA ENCONTRADA • ADICIONE ARQUIVOS"
         } else {
-            "${tracks.size} música(s) encontrada(s)."
+            tracks.size.toString() + " MÚSICA(S) NA BIBLIOTECA"
         }
     }
 
