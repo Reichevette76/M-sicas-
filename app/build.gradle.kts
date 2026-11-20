@@ -11,8 +11,8 @@ android {
         applicationId = "br.com.reimusicplayer"
         minSdk = 23
         targetSdk = 35
-        versionCode = 8
-        versionName = "0.5.3"
+        versionCode = 9
+        versionName = "0.5.4"
     }
 
     compileOptions {
