@@ -77,8 +77,16 @@ class PlaybackService : MediaLibraryService() {
 
             val resolvedItems = mutableListOf<MediaItem>()
             for (requested in mediaItems) {
+                // O Android Auto legado pode devolver o mediaId como texto da URI,
+                // sem preencher localConfiguration nem requestMetadata.mediaUri.
+                val mediaIdUri = runCatching {
+                    android.net.Uri.parse(requested.mediaId).takeIf {
+                        it.scheme == "content" || it.scheme == "file"
+                    }
+                }.getOrNull()
                 val requestedUri = requested.localConfiguration?.uri
                     ?: requested.requestMetadata.mediaUri
+                    ?: mediaIdUri
 
                 val resolved = availableItems[requested.mediaId]
                     ?: requestedUri?.let { uri ->
