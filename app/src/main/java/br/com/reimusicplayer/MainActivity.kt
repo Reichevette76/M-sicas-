@@ -84,84 +84,95 @@ class MainActivity : AppCompatActivity() {
     private fun buildScreen() {
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(dp(18), dp(14), dp(18), dp(12))
+            setPadding(dp(16), dp(10), dp(16), dp(10))
             setBackgroundColor(0xFF080808.toInt())
         }
+
         val brand = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            gravity = Gravity.CENTER
-            setPadding(0, dp(4), 0, dp(8))
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(dp(8), dp(4), dp(8), dp(8))
         }
-        val crown = ImageView(this).apply {
+        val emblem = ImageView(this).apply {
             setImageResource(R.drawable.ic_rei_crown_headphones)
-            contentDescription = "Coroa com fones de ouvido"
+            contentDescription = "Coroa dourada com fones vermelhos"
             scaleType = ImageView.ScaleType.FIT_CENTER
         }
-        brand.addView(crown, LinearLayout.LayoutParams(dp(68), dp(58)))
+        brand.addView(emblem, LinearLayout.LayoutParams(dp(74), dp(68)))
+        val brandText = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
         val rei = TextView(this).apply {
             text = "REI"
-            textSize = 34f
-            setTextColor(0xFFFFFFFF.toInt())
-            gravity = Gravity.CENTER
+            textSize = 30f
+            setTextColor(0xFFE6E8ED.toInt())
             typeface = android.graphics.Typeface.create("sans-serif-black", android.graphics.Typeface.BOLD)
-            letterSpacing = 0.12f
+            letterSpacing = 0.10f
         }
-        brand.addView(rei)
+        brandText.addView(rei)
         val music = TextView(this).apply {
-            text = "M U S I C"
-            textSize = 13f
-            setTextColor(0xFFE31B23.toInt())
-            gravity = Gravity.CENTER
-            typeface = android.graphics.Typeface.DEFAULT_BOLD
-            letterSpacing = 0.18f
-        }
-        brand.addView(music)
-        root.addView(brand, LinearLayout.LayoutParams(-1, dp(142)))
-
-        val subtitle = TextView(this).apply {
-            text = "SUA MÚSICA. DO SEU JEITO."
+            text = "M U S I C   P L A Y E R"
             textSize = 11f
-            setTextColor(0xFFB7B7B7.toInt())
-            gravity = Gravity.CENTER
-            letterSpacing = 0.08f
+            setTextColor(0xFFE31B23.toInt())
+            typeface = android.graphics.Typeface.DEFAULT_BOLD
+            letterSpacing = 0.10f
         }
-        root.addView(subtitle, LinearLayout.LayoutParams(-1, dp(28)))
+        brandText.addView(music)
+        brand.addView(brandText, LinearLayout.LayoutParams(0, -2, 1f))
+        root.addView(brand, LinearLayout.LayoutParams(-1, dp(76)))
 
         status = TextView(this).apply {
             text = "Preparando sua biblioteca..."
-            textSize = 13f
-            setTextColor(0xFFE31B23.toInt())
+            textSize = 12f
+            setTextColor(0xFFFF7777.toInt())
             gravity = Gravity.CENTER_VERTICAL
-            setPadding(dp(4), 0, dp(4), 0)
+            setPadding(dp(14), 0, dp(14), 0)
+            background = android.graphics.drawable.GradientDrawable().apply {
+                setColor(0xFF241012.toInt())
+                cornerRadius = dp(13).toFloat()
+                setStroke(dp(1), 0xFF632026.toInt())
+            }
         }
-        root.addView(status, LinearLayout.LayoutParams(-1, dp(38)))
+        root.addView(status, LinearLayout.LayoutParams(-1, dp(38)).apply { bottomMargin = dp(8) })
 
-        currentTrack = TextView(this).apply {
-            text = "NENHUMA MÚSICA TOCANDO"
-            textSize = 14f
-            setTextColor(0xFFFFFFFF.toInt())
-            gravity = Gravity.CENTER
-            setPadding(dp(10), dp(8), dp(10), dp(8))
-            setBackgroundColor(0xFF191919.toInt())
-            typeface = android.graphics.Typeface.DEFAULT_BOLD
+        val nowPlaying = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(dp(16), dp(8), dp(16), dp(8))
+            background = android.graphics.drawable.GradientDrawable().apply {
+                setColor(0xFF171719.toInt())
+                cornerRadius = dp(16).toFloat()
+                setStroke(dp(1), 0xFF333338.toInt())
+            }
         }
-        root.addView(currentTrack, LinearLayout.LayoutParams(-1, dp(58)))
+        val nowLabel = TextView(this).apply {
+            text = "TOCANDO AGORA"
+            textSize = 10f
+            setTextColor(0xFFE31B23.toInt())
+            typeface = android.graphics.Typeface.DEFAULT_BOLD
+            letterSpacing = 0.12f
+        }
+        nowPlaying.addView(nowLabel)
+        currentTrack = TextView(this).apply {
+            text = "Nenhuma música selecionada"
+            textSize = 14f
+            setTextColor(0xFFF5F5F5.toInt())
+            typeface = android.graphics.Typeface.create("sans-serif-medium", android.graphics.Typeface.BOLD)
+            maxLines = 2
+            setPadding(0, dp(3), 0, 0)
+        }
+        nowPlaying.addView(currentTrack)
+        root.addView(nowPlaying, LinearLayout.LayoutParams(-1, dp(66)).apply { bottomMargin = dp(8) })
 
         val controls = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER
-            setPadding(0, dp(8), 0, dp(8))
         }
-        val previous = makeButton("ANTERIOR")
-        val playPause = makeButton("TOCAR / PAUSAR")
-        val next = makeButton("PRÓXIMA")
-        controls.addView(previous, LinearLayout.LayoutParams(0, dp(48), 1f).apply { marginEnd = dp(4) })
-        controls.addView(playPause, LinearLayout.LayoutParams(0, dp(48), 1.25f).apply {
-            marginStart = dp(4)
-            marginEnd = dp(4)
-        })
-        controls.addView(next, LinearLayout.LayoutParams(0, dp(48), 1f).apply { marginStart = dp(4) })
-        root.addView(controls, LinearLayout.LayoutParams(-1, dp(64)))
+        val previous = makeButton("‹  ANTERIOR")
+        val playPause = makeButton("▶  TOCAR / PAUSAR")
+        val next = makeButton("PRÓXIMA  ›")
+        controls.addView(previous, LinearLayout.LayoutParams(0, dp(46), 1f).apply { marginEnd = dp(4) })
+        controls.addView(playPause, LinearLayout.LayoutParams(0, dp(46), 1.35f).apply { marginStart = dp(4); marginEnd = dp(4) })
+        controls.addView(next, LinearLayout.LayoutParams(0, dp(46), 1f).apply { marginStart = dp(4) })
+        root.addView(controls, LinearLayout.LayoutParams(-1, dp(50)).apply { bottomMargin = dp(7) })
 
         previous.setOnClickListener {
             mediaController?.let { player -> if (player.hasPreviousMediaItem()) player.seekToPreviousMediaItem() }
@@ -173,21 +184,33 @@ class MainActivity : AppCompatActivity() {
             mediaController?.let { player -> if (player.hasNextMediaItem()) player.seekToNextMediaItem() }
         }
 
+        val libraryHeader = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(dp(2), dp(4), dp(2), dp(5))
+        }
         val libraryTitle = TextView(this).apply {
-            text = "MINHAS MÚSICAS"
+            text = "MINHA BIBLIOTECA"
             textSize = 13f
-            setTextColor(0xFFE31B23.toInt())
+            setTextColor(0xFFF1F1F1.toInt())
             typeface = android.graphics.Typeface.DEFAULT_BOLD
             letterSpacing = 0.08f
-            setPadding(dp(2), dp(10), 0, dp(8))
         }
-        root.addView(libraryTitle)
+        libraryHeader.addView(libraryTitle, LinearLayout.LayoutParams(0, -2, 1f))
+        val libraryHint = TextView(this).apply {
+            text = "Toque para reproduzir"
+            textSize = 10f
+            setTextColor(0xFF929292.toInt())
+        }
+        libraryHeader.addView(libraryHint)
+        root.addView(libraryHeader)
 
         trackList = ListView(this).apply {
-            divider = android.graphics.drawable.ColorDrawable(0xFF333333.toInt())
+            divider = android.graphics.drawable.ColorDrawable(0xFF303034.toInt())
             dividerHeight = dp(1)
-            setBackgroundColor(0xFF121212.toInt())
-            cacheColorHint = 0xFF121212.toInt()
+            setBackgroundColor(0xFF141416.toInt())
+            cacheColorHint = 0xFF141416.toInt()
+            isVerticalScrollBarEnabled = true
         }
         root.addView(trackList, LinearLayout.LayoutParams(-1, 0, 1f))
         trackList.setOnItemClickListener { _, _, position, _ ->
@@ -204,17 +227,28 @@ class MainActivity : AppCompatActivity() {
             true
         }
 
-        val onlineButton = makeButton("BUSCAR MÚSICAS ONLINE")
+        val actions = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER
+            setPadding(0, dp(8), 0, 0)
+        }
+        val onlineButton = makeButton("BUSCAR ONLINE")
         onlineButton.setOnClickListener { startActivity(android.content.Intent(this, OnlineSearchActivity::class.java)) }
-        root.addView(onlineButton, LinearLayout.LayoutParams(-1, dp(46)).apply { topMargin = dp(8) })
-
-        val importButton = makeButton("ADICIONAR MÚSICAS")
+        val importButton = makeButton("＋  IMPORTAR")
         importButton.setOnClickListener { audioPicker.launch(arrayOf("audio/*")) }
-        root.addView(importButton, LinearLayout.LayoutParams(-1, dp(46)).apply { topMargin = dp(8) })
+        actions.addView(onlineButton, LinearLayout.LayoutParams(0, dp(44), 1f).apply { marginEnd = dp(5) })
+        actions.addView(importButton, LinearLayout.LayoutParams(0, dp(44), 1f).apply { marginStart = dp(5) })
+        root.addView(actions, LinearLayout.LayoutParams(-1, dp(52)))
 
-        val refresh = makeButton("ATUALIZAR BIBLIOTECA")
-        refresh.setOnClickListener { loadTracks() }
-        root.addView(refresh, LinearLayout.LayoutParams(-1, dp(46)).apply { topMargin = dp(6) })
+        val refresh = TextView(this).apply {
+            text = "↻  ATUALIZAR BIBLIOTECA"
+            textSize = 10f
+            setTextColor(0xFFBDBDC2.toInt())
+            gravity = Gravity.CENTER
+            typeface = android.graphics.Typeface.DEFAULT_BOLD
+            setOnClickListener { loadTracks() }
+        }
+        root.addView(refresh, LinearLayout.LayoutParams(-1, dp(28)))
         setContentView(root)
     }
 
@@ -263,13 +297,21 @@ class MainActivity : AppCompatActivity() {
     private fun makeButton(label: String): Button =
         Button(this).apply {
             text = label
-            textSize = 11f
+            textSize = 10f
             isAllCaps = false
             setTextColor(0xFFFFFFFF.toInt())
-            backgroundTintList = android.content.res.ColorStateList.valueOf(0xFFD71920.toInt())
-            typeface = android.graphics.Typeface.DEFAULT_BOLD
-            minHeight = dp(44)
-            minimumHeight = dp(44)
+            backgroundTintList = null
+            background = android.graphics.drawable.GradientDrawable().apply {
+                setColor(0xFFD71920.toInt())
+                cornerRadius = dp(13).toFloat()
+                setStroke(dp(1), 0xFFFF4B52.toInt())
+            }
+            typeface = android.graphics.Typeface.create("sans-serif-medium", android.graphics.Typeface.BOLD)
+            minHeight = dp(42)
+            minimumHeight = dp(42)
+            setPadding(dp(5), 0, dp(5), 0)
+            stateListAnimator = null
+            elevation = dp(2).toFloat()
         }
 
     private fun connectToPlayer() {
