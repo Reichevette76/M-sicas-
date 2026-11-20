@@ -64,6 +64,45 @@ class PlaybackService : MediaLibraryService() {
                 LibraryResult.ofItemList(pageItems, params)
             )
         }
+
+        // Android Auto pode enviar apenas o mediaId ao selecionar uma faixa.
+        // Recuperamos o MediaItem completo para que o ExoPlayer receba sua URI.
+        override fun onAddMediaItems(
+            mediaSession: MediaSession,
+            controller: MediaSession.ControllerInfo,
+            mediaItems: List<MediaItem>
+        ): ListenableFuture<List<MediaItem>> {
+            val availableItems = AudioLibrary.load(this@PlaybackService)
+                .associateBy { it.mediaId }
+
+            val resolvedItems = mutableListOf<MediaItem>()
+            for (requested in mediaItems) {
+                val requestedUri = requested.localConfiguration?.uri
+                    ?: requested.requestMetadata.mediaUri
+
+                val resolved = availableItems[requested.mediaId]
+                    ?: requestedUri?.let { uri ->
+                        availableItems[uri.toString()]
+                            ?: MediaItem.Builder()
+                                .setMediaId(requested.mediaId.ifBlank { uri.toString() })
+                                .setUri(uri)
+                                .setMediaMetadata(requested.mediaMetadata)
+                                .build()
+                    }
+                    ?: requested.takeIf { it.localConfiguration != null }
+
+                if (resolved == null) {
+                    return Futures.immediateFailedFuture(
+                        IllegalArgumentException(
+                            "Música não encontrada na biblioteca: ${requested.mediaId}"
+                        )
+                    )
+                }
+                resolvedItems.add(resolved)
+            }
+
+            return Futures.immediateFuture(resolvedItems)
+        }
     }
 
     override fun onCreate() {
