@@ -20,6 +20,7 @@ class OnlineSearchActivity : AppCompatActivity() {
     private lateinit var results: LinearLayout
     private lateinit var status: TextView
     private val prefs by lazy { getSharedPreferences("online_music", MODE_PRIVATE) }
+    private val defaultJamendoClientId = "b4338639"
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -74,7 +75,10 @@ class OnlineSearchActivity : AppCompatActivity() {
         scroll.addView(results)
         root.addView(scroll, LinearLayout.LayoutParams(-1, 0, 1f))
         setContentView(root)
-        if (prefs.getString("jamendo_client_id", null).isNullOrBlank()) askClientId()
+        if (prefs.getString("jamendo_client_id", null).isNullOrBlank()) {
+            prefs.edit().putString("jamendo_client_id", defaultJamendoClientId).apply()
+            status.text = "Catálogo autorizado conectado. Digite uma música ou artista para pesquisar."
+        }
     }
 
     private fun askClientId() {
@@ -103,7 +107,7 @@ class OnlineSearchActivity : AppCompatActivity() {
 
     private fun searchJamendo() {
         val term = query.text.toString().trim()
-        val clientId = prefs.getString("jamendo_client_id", null)
+        val clientId = prefs.getString("jamendo_client_id", defaultJamendoClientId)
         if (term.isEmpty()) { status.text = "Digite o nome de uma música ou artista."; return }
         if (clientId.isNullOrBlank()) { askClientId(); return }
         status.text = "Pesquisando no catálogo..."
