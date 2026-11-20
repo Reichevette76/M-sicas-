@@ -292,10 +292,8 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun loadTracks() {
-        if (!hasAudioPermission()) {
-            permissionRequest.launch(audioPermission())
-            return
-        }
+        // Downloads salvos na pasta privada do app devem aparecer mesmo sem permissão
+        // para ler a biblioteca de áudio externa do Android.
         tracks.clear()
         tracks.addAll(AudioLibrary.load(this))
         val names = tracks.map { item ->
