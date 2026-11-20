@@ -10,7 +10,7 @@
 
     <application
         android:allowBackup="true"
-        android:label="Rei Music Player"
+        android:label="REI MUSIC"
         android:appCategory="audio"
         android:icon="@drawable/ic_rei_crown_headphones"
         android:roundIcon="@drawable/ic_rei_crown_headphones"
@@ -38,7 +38,7 @@
             android:name=".PlaybackService"
             android:exported="true"
             android:foregroundServiceType="mediaPlayback"
-            android:label="Rei Music Player">
+            android:label="REI MUSIC">
             <intent-filter>
                 <action android:name="androidx.media3.session.MediaLibraryService" />
                 <action android:name="android.media.browse.MediaBrowserService" />
