@@ -19,33 +19,61 @@ object AudioLibrary {
         } else {
             MediaStore.Audio.Media.EXTERNAL_CONTENT_URI
         }
-        val projection = arrayOf(MediaStore.Audio.Media._ID, MediaStore.Audio.Media.TITLE, MediaStore.Audio.Media.ARTIST)
+        val projection = arrayOf(
+            MediaStore.Audio.Media._ID,
+            MediaStore.Audio.Media.TITLE,
+            MediaStore.Audio.Media.ARTIST
+        )
         val selection = MediaStore.Audio.Media.IS_MUSIC + " != 0"
         val sortOrder = MediaStore.Audio.Media.TITLE + " COLLATE NOCASE ASC"
 
-        context.contentResolver.query(collection, projection, selection, null, sortOrder)?.use { cursor ->
-            val idColumn = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media._ID)
-            val titleColumn = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.TITLE)
-            val artistColumn = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.ARTIST)
-            while (cursor.moveToNext()) {
-                val id = cursor.getLong(idColumn)
-                val title = cursor.getString(titleColumn) ?: "Faixa sem título"
-                val artist = cursor.getString(artistColumn) ?: "Artista desconhecido"
-                val contentUri = ContentUris.withAppendedId(collection, id)
-                val metadata = MediaMetadata.Builder().setTitle(title).setArtist(artist)
-                    .setIsBrowsable(false).setIsPlayable(true).build()
-                result += MediaItem.Builder().setMediaId(contentUri.toString())
-                    .setUri(contentUri).setMediaMetadata(metadata).build()
+        // Arquivos externos dependem da permissão de áudio; downloads privados do app, não.
+        try {
+            context.contentResolver.query(collection, projection, selection, null, sortOrder)?.use { cursor ->
+                val idColumn = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media._ID)
+                val titleColumn = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.TITLE)
+                val artistColumn = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.ARTIST)
+                while (cursor.moveToNext()) {
+                    val id = cursor.getLong(idColumn)
+                    val title = cursor.getString(titleColumn) ?: "Faixa sem título"
+                    val artist = cursor.getString(artistColumn) ?: "Artista desconhecido"
+                    val contentUri = ContentUris.withAppendedId(collection, id)
+                    val metadata = MediaMetadata.Builder()
+                        .setTitle(title)
+                        .setArtist(artist)
+                        .setIsBrowsable(false)
+                        .setIsPlayable(true)
+                        .build()
+                    result += MediaItem.Builder()
+                        .setMediaId(contentUri.toString())
+                        .setUri(contentUri)
+                        .setMediaMetadata(metadata)
+                        .build()
+                }
             }
+        } catch (_: SecurityException) {
+            // Continua carregando os downloads que o próprio Rei Music salvou.
         }
 
         val importedDirectory = File(context.filesDir, "music")
-        importedDirectory.listFiles()?.filter { it.isFile && isAudioFile(it.name) }?.forEach { file ->
-            val uri = Uri.fromFile(file)
-            val metadata = MediaMetadata.Builder().setTitle(file.nameWithoutExtension)
-                .setArtist("Adicionada ao Rei Music").setIsBrowsable(false).setIsPlayable(true).build()
-            result.add(MediaItem.Builder().setMediaId(uri.toString()).setUri(uri).setMediaMetadata(metadata).build())
-        }
+        importedDirectory.listFiles()
+            ?.filter { it.isFile && isAudioFile(it.name) }
+            ?.forEach { file ->
+                val uri = Uri.fromFile(file)
+                val metadata = MediaMetadata.Builder()
+                    .setTitle(file.nameWithoutExtension)
+                    .setArtist("Adicionada ao Rei Music")
+                    .setIsBrowsable(false)
+                    .setIsPlayable(true)
+                    .build()
+                result.add(
+                    MediaItem.Builder()
+                        .setMediaId(uri.toString())
+                        .setUri(uri)
+                        .setMediaMetadata(metadata)
+                        .build()
+                )
+            }
         return result
     }
 
@@ -76,7 +104,7 @@ object AudioLibrary {
                 input.use { source -> target.outputStream().use { destination -> source.copyTo(destination) } }
                 imported++
             } catch (_: Exception) {
-                // Continue with the remaining selected files.
+                // Continue com os demais arquivos selecionados.
             }
         }
         return imported
@@ -94,5 +122,6 @@ object AudioLibrary {
     }
 
     private fun isAudioFile(name: String): Boolean =
-        name.substringAfterLast('.', "").lowercase() in setOf("mp3", "m4a", "aac", "wav", "ogg", "flac", "opus")
+        name.substringAfterLast('.', "").lowercase() in
+            setOf("mp3", "m4a", "aac", "wav", "ogg", "flac", "opus")
 }
