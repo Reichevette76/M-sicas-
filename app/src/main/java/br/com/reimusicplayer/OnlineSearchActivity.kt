@@ -203,22 +203,27 @@ class OnlineSearchActivity : AppCompatActivity() {
                         val allowed = item.optBoolean("audiodownload_allowed", false)
                         val row = LinearLayout(this).apply {
                             orientation = LinearLayout.VERTICAL
-                            setPadding(8, 12, 8, 12)
+                            setPadding(dp(14), dp(12), dp(14), dp(12))
+                            background = android.graphics.drawable.GradientDrawable().apply {
+                                setColor(0xFF171719.toInt())
+                                cornerRadius = dp(14).toFloat()
+                                setStroke(dp(1), 0xFF343438.toInt())
+                            }
                         }
                         val label = TextView(this).apply {
                             text = "$name\n$artist" + if (allowed && id.isNotBlank()) "\nDownload autorizado" else "\nSomente reprodução online"
-                            setTextColor(0xFFFFFFFF.toInt())
-                            textSize = 15f
+                            setTextColor(0xFFF1F1F3.toInt())
+                            textSize = 14f
+                            setPadding(0, 0, 0, dp(8))
                         }
                         row.addView(label)
                         if (allowed && id.isNotBlank()) {
-                            val save = Button(this).apply {
-                                text = "BAIXAR PARA OUVIR OFFLINE"
+                            val save = actionButton("BAIXAR PARA OUVIR OFFLINE", 0xFFD71920.toInt(), 0xFFFF4B52.toInt()).apply {
                                 setOnClickListener { downloadTrack(id, clientId, name, artist, this) }
                             }
                             row.addView(save)
                         }
-                        results.addView(row)
+                        results.addView(row, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(8) })
                     }
                 }
             } catch (error: Exception) {
