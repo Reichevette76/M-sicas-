@@ -24,54 +24,93 @@ class OnlineSearchActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        window.statusBarColor = 0xFF080808.toInt()
+        window.navigationBarColor = 0xFF080808.toInt()
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(24, 20, 24, 20)
+            setPadding(dp(18), dp(16), dp(18), dp(14))
             setBackgroundColor(0xFF080808.toInt())
         }
+        val heading = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.CENTER
+            setPadding(0, 0, 0, dp(16))
+        }
         val title = TextView(this).apply {
-            text = "BUSCAR MÚSICAS ONLINE"
-            textSize = 20f
-            setTextColor(0xFFE31B23.toInt())
+            text = "REI MUSIC"
+            textSize = 25f
+            setTextColor(0xFFE7E9ED.toInt())
+            typeface = android.graphics.Typeface.create("sans-serif-black", android.graphics.Typeface.BOLD)
+            letterSpacing = 0.08f
             gravity = Gravity.CENTER
         }
-        root.addView(title)
+        heading.addView(title)
+        val subtitle = TextView(this).apply {
+            text = "ENCONTRE NOVAS MÚSICAS"
+            textSize = 10f
+            setTextColor(0xFFE31B23.toInt())
+            typeface = android.graphics.Typeface.DEFAULT_BOLD
+            letterSpacing = 0.16f
+            gravity = Gravity.CENTER
+        }
+        heading.addView(subtitle)
+        root.addView(heading)
+
         query = EditText(this).apply {
             hint = "Digite música ou artista"
             setSingleLine(true)
+            textSize = 15f
             setTextColor(0xFFFFFFFF.toInt())
-            setHintTextColor(0xFFAAAAAA.toInt())
-        }
-        root.addView(query)
-        val youtube = Button(this).apply {
-            text = "PESQUISAR NO YOUTUBE"
-            setOnClickListener {
-                val term = query.text.toString().trim()
-                if (term.isNotEmpty()) {
-                    val url = "https://www.youtube.com/results?search_query=" + Uri.encode(term)
-                    startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
-                }
+            setHintTextColor(0xFF929292.toInt())
+            setPadding(dp(16), dp(4), dp(16), dp(4))
+            background = android.graphics.drawable.GradientDrawable().apply {
+                setColor(0xFF19191C.toInt())
+                cornerRadius = dp(14).toFloat()
+                setStroke(dp(1), 0xFF424247.toInt())
             }
         }
-        root.addView(youtube)
-        val jamendo = Button(this).apply {
-            text = "BUSCAR NO CATÁLOGO AUTORIZADO"
-            setOnClickListener { searchJamendo() }
+        root.addView(query, LinearLayout.LayoutParams(-1, dp(54)).apply { bottomMargin = dp(10) })
+
+        val youtube = actionButton("PESQUISAR NO YOUTUBE", 0xFF29292D.toInt(), 0xFF55555B.toInt())
+        youtube.setOnClickListener {
+            val term = query.text.toString().trim()
+            if (term.isNotEmpty()) {
+                val url = "https://www.youtube.com/results?search_query=" + Uri.encode(term)
+                startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
+            } else {
+                status.text = "Digite o nome de uma música ou artista."
+            }
         }
-        root.addView(jamendo)
-        val keyButton = Button(this).apply {
+        root.addView(youtube, LinearLayout.LayoutParams(-1, dp(46)).apply { bottomMargin = dp(8) })
+        val jamendo = actionButton("BUSCAR NO CATÁLOGO AUTORIZADO", 0xFFD71920.toInt(), 0xFFFF4B52.toInt())
+        jamendo.setOnClickListener { searchJamendo() }
+        root.addView(jamendo, LinearLayout.LayoutParams(-1, dp(48)).apply { bottomMargin = dp(8) })
+        val keyButton = TextView(this).apply {
             text = "CONFIGURAR ACESSO AO CATÁLOGO"
+            textSize = 10f
+            setTextColor(0xFFBDBDC2.toInt())
+            gravity = Gravity.CENTER
+            typeface = android.graphics.Typeface.DEFAULT_BOLD
             setOnClickListener { askClientId() }
         }
-        root.addView(keyButton)
+        root.addView(keyButton, LinearLayout.LayoutParams(-1, dp(32)))
+
         status = TextView(this).apply {
             text = "YouTube abre no serviço oficial. No catálogo, baixe apenas faixas autorizadas."
-            setTextColor(0xFFFFFFFF.toInt())
-            setPadding(0, 12, 0, 12)
+            textSize = 12f
+            setTextColor(0xFFFF8585.toInt())
+            setPadding(dp(12), dp(8), dp(12), dp(8))
+            background = android.graphics.drawable.GradientDrawable().apply {
+                setColor(0xFF241012.toInt())
+                cornerRadius = dp(12).toFloat()
+            }
         }
-        root.addView(status)
+        root.addView(status, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(10) })
         val scroll = ScrollView(this)
-        results = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+        results = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(0, dp(2), 0, dp(4))
+        }
         scroll.addView(results)
         root.addView(scroll, LinearLayout.LayoutParams(-1, 0, 1f))
         setContentView(root)
@@ -80,6 +119,26 @@ class OnlineSearchActivity : AppCompatActivity() {
             status.text = "Catálogo autorizado conectado. Digite uma música ou artista para pesquisar."
         }
     }
+
+    private fun actionButton(label: String, color: Int, stroke: Int): Button =
+        Button(this).apply {
+            text = label
+            textSize = 11f
+            isAllCaps = false
+            setTextColor(0xFFFFFFFF.toInt())
+            backgroundTintList = null
+            background = android.graphics.drawable.GradientDrawable().apply {
+                setColor(color)
+                cornerRadius = dp(13).toFloat()
+                setStroke(dp(1), stroke)
+            }
+            typeface = android.graphics.Typeface.DEFAULT_BOLD
+            minHeight = dp(44)
+            minimumHeight = dp(44)
+            stateListAnimator = null
+        }
+
+    private fun dp(value: Int): Int = (value * resources.displayMetrics.density).toInt()
 
     private fun askClientId() {
         val input = EditText(this).apply {
