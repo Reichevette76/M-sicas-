@@ -4,6 +4,13 @@ import android.Manifest
 import android.app.RecoverableSecurityException
 import android.content.ComponentName
 import android.content.pm.PackageManager
+import android.content.Intent
+import android.os.Handler
+import android.os.Looper
+import android.speech.RecognizerIntent
+import android.speech.RecognitionListener
+import android.speech.SpeechRecognizer
+import java.util.Locale
 import android.os.Build
 import android.os.Bundle
 import android.provider.MediaStore
@@ -32,6 +39,11 @@ class MainActivity : AppCompatActivity() {
     private lateinit var status: TextView
     private lateinit var currentTrack: TextView
     private lateinit var trackList: ListView
+    private lateinit var voiceButton: Button
+    private var speechRecognizer: SpeechRecognizer? = null
+    private var voiceEnabled = false
+    private var awaitingVoiceCommand = false
+    private val voiceHandler = Handler(Looper.getMainLooper())
     private val tracks = mutableListOf<MediaItem>()
     private var mediaController: MediaController? = null
     private var controllerFuture: ListenableFuture<MediaController>? = null
@@ -44,6 +56,12 @@ class MainActivity : AppCompatActivity() {
             } else {
                 status.text = "Permita o acesso aos arquivos de áudio para listar suas músicas."
             }
+        }
+
+    private val microphonePermission =
+        registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+            if (granted) enableVoiceCommands()
+            else Toast.makeText(this, "Permita o microfone para usar os comandos de voz.", Toast.LENGTH_LONG).show()
         }
 
     private val audioPicker =
@@ -174,6 +192,18 @@ class MainActivity : AppCompatActivity() {
         controls.addView(next, LinearLayout.LayoutParams(0, dp(46), 1f).apply { marginStart = dp(4) })
         root.addView(controls, LinearLayout.LayoutParams(-1, dp(50)).apply { bottomMargin = dp(7) })
 
+        voiceButton = makeButton("🎙  ATIVAR COMANDO DE VOZ")
+        voiceButton.setOnClickListener {
+            if (voiceEnabled) {
+                disableVoiceCommands()
+            } else if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) {
+                enableVoiceCommands()
+            } else {
+                microphonePermission.launch(Manifest.permission.RECORD_AUDIO)
+            }
+        }
+        root.addView(voiceButton, LinearLayout.LayoutParams(-1, dp(44)).apply { bottomMargin = dp(8) })
+
         previous.setOnClickListener {
             mediaController?.let { player -> if (player.hasPreviousMediaItem()) player.seekToPreviousMediaItem() }
         }
@@ -250,6 +280,126 @@ class MainActivity : AppCompatActivity() {
         }
         root.addView(refresh, LinearLayout.LayoutParams(-1, dp(28)))
         setContentView(root)
+    }
+
+    private fun enableVoiceCommands() {
+        if (!SpeechRecognizer.isRecognitionAvailable(this)) {
+            Toast.makeText(this, "O reconhecimento de voz não está disponível neste Android.", Toast.LENGTH_LONG).show()
+            return
+        }
+        voiceEnabled = true
+        awaitingVoiceCommand = false
+        voiceButton.text = "■  DESATIVAR COMANDO DE VOZ"
+        status.text = "COMANDO DE VOZ ATIVO • DIGA REI"
+        speechRecognizer = SpeechRecognizer.createSpeechRecognizer(this).also { recognizer ->
+            recognizer.setRecognitionListener(object : RecognitionListener {
+                override fun onReadyForSpeech(params: Bundle?) {
+                    if (voiceEnabled) status.text = if (awaitingVoiceCommand) "OUVINDO COMANDO..." else "OUVINDO • DIGA REI"
+                }
+                override fun onBeginningOfSpeech() {}
+                override fun onRmsChanged(rmsdB: Float) {}
+                override fun onBufferReceived(buffer: ByteArray?) {}
+                override fun onEndOfSpeech() {}
+                override fun onError(error: Int) {
+                    if (voiceEnabled) restartVoiceListening(650L)
+                }
+                override fun onResults(results: Bundle?) {
+                    val phrase = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)?.firstOrNull()
+                    if (!phrase.isNullOrBlank()) handleVoicePhrase(phrase)
+                    if (voiceEnabled) restartVoiceListening(350L)
+                }
+                override fun onPartialResults(partialResults: Bundle?) {}
+                override fun onEvent(eventType: Int, params: Bundle?) {}
+            })
+        }
+        startVoiceListening()
+    }
+
+    private fun disableVoiceCommands() {
+        voiceEnabled = false
+        awaitingVoiceCommand = false
+        voiceHandler.removeCallbacksAndMessages(null)
+        speechRecognizer?.cancel()
+        speechRecognizer?.destroy()
+        speechRecognizer = null
+        if (::voiceButton.isInitialized) voiceButton.text = "🎙  ATIVAR COMANDO DE VOZ"
+        if (::status.isInitialized) status.text = "COMANDO DE VOZ DESATIVADO"
+    }
+
+    private fun startVoiceListening() {
+        if (!voiceEnabled) return
+        val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+            putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+            putExtra(RecognizerIntent.EXTRA_LANGUAGE, "pt-BR")
+            putExtra(RecognizerIntent.EXTRA_LANGUAGE_PREFERENCE, "pt-BR")
+            putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, false)
+            putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 3)
+        }
+        try {
+            speechRecognizer?.startListening(intent)
+        } catch (_: Exception) {
+            restartVoiceListening(1000L)
+        }
+    }
+
+    private fun restartVoiceListening(delay: Long) {
+        voiceHandler.removeCallbacksAndMessages(null)
+        voiceHandler.postDelayed({
+            if (voiceEnabled) startVoiceListening()
+        }, delay)
+    }
+
+    private fun handleVoicePhrase(rawPhrase: String) {
+        val phrase = rawPhrase.lowercase(Locale("pt", "BR"))
+            .replace(Regex("[^a-záàâãéèêíïóôõöúç ]"), " ")
+            .trim()
+        val startsWithRei = phrase == "rei" || phrase.startsWith("rei ")
+        val commandText = when {
+            startsWithRei -> phrase.removePrefix("rei").trim()
+            awaitingVoiceCommand -> phrase
+            else -> return
+        }
+
+        if (startsWithRei && commandText.isBlank()) {
+            awaitingVoiceCommand = true
+            status.text = "REI ATIVADO • AGUARDANDO COMANDO"
+            return
+        }
+        awaitingVoiceCommand = false
+        val player = mediaController
+        when {
+            commandText.contains("desligar") || commandText.contains("desativa") || commandText.contains("parar de ouvir") -> {
+                disableVoiceCommands()
+                Toast.makeText(this, "Comando de voz desligado.", Toast.LENGTH_SHORT).show()
+            }
+            commandText.contains("pausar") || commandText == "pause" -> {
+                player?.pause()
+                status.text = "COMANDO RECONHECIDO • PAUSAR"
+            }
+            commandText.contains("próxima") || commandText.contains("proxima") || commandText.contains("avançar") || commandText.contains("avancar") -> {
+                if (player?.hasNextMediaItem() == true) player.seekToNextMediaItem()
+                status.text = "COMANDO RECONHECIDO • PRÓXIMA MÚSICA"
+            }
+            commandText.contains("anterior") || commandText.contains("voltar música") || commandText.contains("voltar musica") -> {
+                if (player?.hasPreviousMediaItem() == true) player.seekToPreviousMediaItem()
+                status.text = "COMANDO RECONHECIDO • MÚSICA ANTERIOR"
+            }
+            commandText.contains("aumentar volume") || commandText.contains("mais volume") || commandText.contains("volume acima") -> {
+                if (player != null) player.volume = (player.volume + 0.1f).coerceAtMost(1f)
+                status.text = "VOLUME AUMENTADO"
+            }
+            commandText.contains("diminuir volume") || commandText.contains("menos volume") || commandText.contains("volume abaixo") -> {
+                if (player != null) player.volume = (player.volume - 0.1f).coerceAtLeast(0f)
+                status.text = "VOLUME DIMINUÍDO"
+            }
+            commandText.contains("tocar") || commandText.contains("reproduzir") || commandText.contains("continuar") || commandText == "play" -> {
+                player?.play()
+                status.text = "COMANDO RECONHECIDO • TOCAR"
+            }
+            else -> {
+                status.text = "NÃO ENTENDI • DIGA REI E O COMANDO"
+            }
+        }
     }
 
     private fun confirmDeleteTrack(position: Int) {
@@ -371,6 +521,7 @@ class MainActivity : AppCompatActivity() {
     private fun dp(value: Int): Int = (value * resources.displayMetrics.density).toInt()
 
     override fun onDestroy() {
+        disableVoiceCommands()
         controllerFuture?.let { MediaController.releaseFuture(it) }
         mediaController = null
         controllerFuture = null
