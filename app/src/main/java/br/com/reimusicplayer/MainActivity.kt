@@ -199,6 +199,10 @@ class MainActivity : AppCompatActivity() {
             true
         }
 
+        val onlineButton = makeButton("BUSCAR MÚSICAS ONLINE")
+        onlineButton.setOnClickListener { startActivity(android.content.Intent(this, OnlineSearchActivity::class.java)) }
+        root.addView(onlineButton, LinearLayout.LayoutParams(-1, dp(46)).apply { topMargin = dp(8) })
+
         val importButton = makeButton("ADICIONAR MÚSICAS")
         importButton.setOnClickListener { audioPicker.launch(arrayOf("audio/*")) }
         root.addView(importButton, LinearLayout.LayoutParams(-1, dp(46)).apply { topMargin = dp(8) })
