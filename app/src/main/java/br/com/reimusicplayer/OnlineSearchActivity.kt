@@ -166,22 +166,47 @@ class OnlineSearchActivity : AppCompatActivity() {
         button.text = "BAIXANDO..."
         executor.execute {
             try {
-                val connection = URL(url).openConnection() as HttpURLConnection
-                connection.connectTimeout = 15000
-                connection.readTimeout = 30000
+                val connection = (URL(url).openConnection() as HttpURLConnection).apply {
+                    connectTimeout = 20000
+                    readTimeout = 60000
+                    instanceFollowRedirects = true
+                    setRequestProperty("User-Agent", "ReiMusicPlayer/1.0 (Android)")
+                }
                 val directory = File(filesDir, "music")
-                if (!directory.exists()) directory.mkdirs()
+                if (!directory.exists() && !directory.mkdirs()) {
+                    throw IllegalStateException("Não foi possível criar a pasta da biblioteca.")
+                }
                 val safe = (artist + " - " + name).replace(Regex("[^A-Za-z0-9._ -]"), "_").take(100)
                 var file = File(directory, "$safe.mp3")
                 var n = 2
                 while (file.exists()) { file = File(directory, "$safe ($n).mp3"); n++ }
-                connection.inputStream.use { source -> file.outputStream().use { target -> source.copyTo(target) } }
-                connection.disconnect()
+                val temporary = File(directory, file.name + ".part")
+                try {
+                    val code = connection.responseCode
+                    if (code !in 200..299) throw IllegalStateException("Servidor respondeu HTTP $code")
+                    val mime = connection.contentType?.lowercase().orEmpty()
+                    if (mime.contains("text/html") || mime.contains("application/json")) {
+                        throw IllegalStateException("O serviço não entregou um arquivo de áudio.")
+                    }
+                    connection.inputStream.use { source ->
+                        temporary.outputStream().buffered().use { target -> source.copyTo(target) }
+                    }
+                    if (!temporary.exists() || temporary.length() < 1024L) {
+                        throw IllegalStateException("O arquivo recebido está vazio ou incompleto.")
+                    }
+                    if (!temporary.renameTo(file)) {
+                        temporary.copyTo(file, overwrite = false)
+                        temporary.delete()
+                    }
+                } finally {
+                    connection.disconnect()
+                    if (temporary.exists()) temporary.delete()
+                }
                 runOnUiThread {
-                    button.text = "SALVA NA BIBLIOTECA"
-                    button.isEnabled = true
-                    status.text = "Música salva! Atualize a biblioteca para ouvir offline."
-                    Toast.makeText(this, "Download concluído.", Toast.LENGTH_LONG).show()
+                    button.text = "BAIXADA • NA BIBLIOTECA"
+                    button.isEnabled = false
+                    status.text = "Download concluído: " + file.name + ". Volte à biblioteca para ouvir offline."
+                    Toast.makeText(this, "Música baixada para a biblioteca do Rei Music.", Toast.LENGTH_LONG).show()
                 }
             } catch (error: Exception) {
                 runOnUiThread {
