@@ -116,13 +116,20 @@ class OnlineSearchActivity : AppCompatActivity() {
             try {
                 val encoded = URLEncoder.encode(term, "UTF-8")
                 val endpoint = "https://api.jamendo.com/v3.0/tracks/?client_id=" +
-                    URLEncoder.encode(clientId, "UTF-8") + "&format=json&limit=25&search=" + encoded + "&audioformat=mp32"
+                    URLEncoder.encode(clientId, "UTF-8") + "&format=json&limit=25&search=" + encoded +
+                    "&audioformat=mp32&audiodlformat=mp32"
                 val connection = URL(endpoint).openConnection() as HttpURLConnection
                 connection.connectTimeout = 15000
                 connection.readTimeout = 20000
-                val body = connection.inputStream.bufferedReader().use { it.readText() }
-                connection.disconnect()
-                val tracks = JSONObject(body).optJSONArray("results")
+                val body = try {
+                    val code = connection.responseCode
+                    if (code !in 200..299) throw IllegalStateException("Jamendo HTTP $code")
+                    connection.inputStream.bufferedReader().use { it.readText() }
+                } finally {
+                    connection.disconnect()
+                }
+                val response = JSONObject(body)
+                val tracks = response.optJSONArray("results")
                 runOnUiThread {
                     if (tracks == null || tracks.length() == 0) {
                         status.text = "Nenhuma música encontrada."
@@ -131,24 +138,24 @@ class OnlineSearchActivity : AppCompatActivity() {
                     status.text = tracks.length().toString() + " resultado(s)."
                     for (i in 0 until tracks.length()) {
                         val item = tracks.getJSONObject(i)
+                        val id = item.optString("id", "")
                         val name = item.optString("name", "Faixa")
                         val artist = item.optString("artist_name", "Artista")
                         val allowed = item.optBoolean("audiodownload_allowed", false)
-                        val downloadUrl = item.optString("audiodownload", "")
                         val row = LinearLayout(this).apply {
                             orientation = LinearLayout.VERTICAL
                             setPadding(8, 12, 8, 12)
                         }
                         val label = TextView(this).apply {
-                            text = "$name\n$artist" + if (allowed && downloadUrl.isNotBlank()) "\nDownload autorizado" else "\nSomente reprodução online"
+                            text = "$name\n$artist" + if (allowed && id.isNotBlank()) "\nDownload autorizado" else "\nSomente reprodução online"
                             setTextColor(0xFFFFFFFF.toInt())
                             textSize = 15f
                         }
                         row.addView(label)
-                        if (allowed && downloadUrl.startsWith("https://")) {
+                        if (allowed && id.isNotBlank()) {
                             val save = Button(this).apply {
                                 text = "BAIXAR PARA OUVIR OFFLINE"
-                                setOnClickListener { downloadTrack(downloadUrl, name, artist, this) }
+                                setOnClickListener { downloadTrack(id, clientId, name, artist, this) }
                             }
                             row.addView(save)
                         }
@@ -156,63 +163,98 @@ class OnlineSearchActivity : AppCompatActivity() {
                     }
                 }
             } catch (error: Exception) {
-                runOnUiThread { status.text = "Erro na busca. Verifique a internet e o Client ID." }
+                runOnUiThread {
+                    status.text = "Erro na busca: " + (error.message ?: "verifique a internet e o Client ID.")
+                }
             }
         }
     }
 
-    private fun downloadTrack(url: String, name: String, artist: String, button: Button) {
+    // O método oficial /tracks/file exige client_id + id e responde com redirecionamento
+    // para o arquivo. Usamos esse endpoint em vez de depender de um link de download antigo.
+    private fun downloadTrack(trackId: String, clientId: String, name: String, artist: String, button: Button) {
         button.isEnabled = false
         button.text = "BAIXANDO..."
+        status.text = "Baixando música autorizada..."
         executor.execute {
+            var temporary: File? = null
+            var finalFile: File? = null
             try {
-                val connection = (URL(url).openConnection() as HttpURLConnection).apply {
+                val endpoint = "https://api.jamendo.com/v3.0/tracks/file/?" +
+                    "client_id=" + URLEncoder.encode(clientId, "UTF-8") +
+                    "&id=" + URLEncoder.encode(trackId, "UTF-8") +
+                    "&audioformat=mp32&action=download"
+                val connection = (URL(endpoint).openConnection() as HttpURLConnection).apply {
                     connectTimeout = 20000
-                    readTimeout = 60000
+                    readTimeout = 90000
                     instanceFollowRedirects = true
-                    setRequestProperty("User-Agent", "ReiMusicPlayer/1.0 (Android)")
+                    requestMethod = "GET"
+                    setRequestProperty("User-Agent", "ReiMusicPlayer/0.5.3 (Android)")
+                    setRequestProperty("Accept", "audio/mpeg, audio/*, application/octet-stream, */*")
                 }
-                val directory = File(filesDir, "music")
-                if (!directory.exists() && !directory.mkdirs()) {
-                    throw IllegalStateException("Não foi possível criar a pasta da biblioteca.")
-                }
-                val safe = (artist + " - " + name).replace(Regex("[^A-Za-z0-9._ -]"), "_").take(100)
-                var file = File(directory, "$safe.mp3")
-                var n = 2
-                while (file.exists()) { file = File(directory, "$safe ($n).mp3"); n++ }
-                val temporary = File(directory, file.name + ".part")
                 try {
                     val code = connection.responseCode
-                    if (code !in 200..299) throw IllegalStateException("Servidor respondeu HTTP $code")
+                    if (code !in 200..299) {
+                        val detail = connection.errorStream?.bufferedReader()?.use { it.readText() }
+                            ?.take(180).orEmpty()
+                        throw IllegalStateException("Jamendo respondeu HTTP $code" +
+                            if (detail.isNotBlank()) ": $detail" else "")
+                    }
                     val mime = connection.contentType?.lowercase().orEmpty()
-                    if (mime.contains("text/html") || mime.contains("application/json")) {
-                        throw IllegalStateException("O serviço não entregou um arquivo de áudio.")
+                    if (mime.contains("text/html") || mime.contains("application/json") || mime.contains("text/plain")) {
+                        val detail = connection.inputStream.bufferedReader().use { it.readText() }.take(180)
+                        throw IllegalStateException("O Jamendo não entregou o áudio: $detail")
                     }
+
+                    val directory = File(filesDir, "music")
+                    if (!directory.exists() && !directory.mkdirs()) {
+                        throw IllegalStateException("Não foi possível criar a biblioteca.")
+                    }
+                    val safe = (artist + " - " + name)
+                        .replace(Regex("[^A-Za-z0-9._ -]"), "_").trim().take(100)
+                    var destination = File(directory, "$safe.mp3")
+                    var number = 2
+                    while (destination.exists()) {
+                        destination = File(directory, "$safe ($number).mp3")
+                        number++
+                    }
+                    finalFile = destination
+                    temporary = File(directory, destination.name + ".part")
                     connection.inputStream.use { source ->
-                        temporary.outputStream().buffered().use { target -> source.copyTo(target) }
+                        temporary!!.outputStream().buffered().use { target ->
+                            val buffer = ByteArray(16 * 1024)
+                            while (true) {
+                                val count = source.read(buffer)
+                                if (count < 0) break
+                                target.write(buffer, 0, count)
+                            }
+                        }
                     }
-                    if (!temporary.exists() || temporary.length() < 1024L) {
+                    if (!temporary!!.exists() || temporary!!.length() < 1024L) {
                         throw IllegalStateException("O arquivo recebido está vazio ou incompleto.")
                     }
-                    if (!temporary.renameTo(file)) {
-                        temporary.copyTo(file, overwrite = false)
-                        temporary.delete()
+                    if (!temporary!!.renameTo(destination)) {
+                        temporary!!.copyTo(destination, overwrite = false)
+                        temporary!!.delete()
                     }
                 } finally {
                     connection.disconnect()
-                    if (temporary.exists()) temporary.delete()
                 }
+
                 runOnUiThread {
                     button.text = "BAIXADA • NA BIBLIOTECA"
                     button.isEnabled = false
-                    status.text = "Download concluído: " + file.name + ". Volte à biblioteca para ouvir offline."
+                    status.text = "Download concluído: " + (finalFile?.name ?: "música") +
+                        ". Atualize a biblioteca para ouvir offline."
                     Toast.makeText(this, "Música baixada para a biblioteca do Rei Music.", Toast.LENGTH_LONG).show()
                 }
             } catch (error: Exception) {
+                temporary?.delete()
+                finalFile?.takeIf { it.exists() && it.length() == 0L }?.delete()
                 runOnUiThread {
                     button.text = "TENTAR NOVAMENTE"
                     button.isEnabled = true
-                    status.text = "Não foi possível baixar esta faixa."
+                    status.text = "Falha no download: " + (error.message ?: "erro desconhecido")
                 }
             }
         }
