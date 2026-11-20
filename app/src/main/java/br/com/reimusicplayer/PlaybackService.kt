@@ -1,5 +1,7 @@
 package br.com.reimusicplayer
 
+import androidx.media3.common.AudioAttributes
+import androidx.media3.common.C
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MediaMetadata
 import androidx.media3.common.util.UnstableApi
@@ -115,7 +117,17 @@ class PlaybackService : MediaLibraryService() {
 
     override fun onCreate() {
         super.onCreate()
-        player = ExoPlayer.Builder(this).build()
+        val audioAttributes = AudioAttributes.Builder()
+            .setUsage(C.USAGE_MEDIA)
+            .setContentType(C.AUDIO_CONTENT_TYPE_MUSIC)
+            .build()
+
+        player = ExoPlayer.Builder(this)
+            // Solicita foco de áudio para o Android interromper/baixar o rádio
+            // quando a reprodução do aplicativo começar.
+            .setAudioAttributes(audioAttributes, true)
+            .setHandleAudioBecomingNoisy(true)
+            .build()
         librarySession = MediaLibrarySession.Builder(this, player, libraryCallback).build()
     }
 
