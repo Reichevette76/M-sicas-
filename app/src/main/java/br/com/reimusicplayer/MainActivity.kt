@@ -137,6 +137,22 @@ class MainActivity : AppCompatActivity() {
         brand.addView(brandText, LinearLayout.LayoutParams(0, -2, 1f))
         root.addView(brand, LinearLayout.LayoutParams(-1, dp(76)))
 
+        // Botão de voz em posição prioritária, logo abaixo da identidade do aplicativo.
+        voiceButton = makeButton("🎙  ATIVAR COMANDO DE VOZ")
+        voiceButton.textSize = 13f
+        voiceButton.minHeight = dp(52)
+        voiceButton.minimumHeight = dp(52)
+        voiceButton.setOnClickListener {
+            if (voiceEnabled) {
+                disableVoiceCommands()
+            } else if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) {
+                enableVoiceCommands()
+            } else {
+                microphonePermission.launch(Manifest.permission.RECORD_AUDIO)
+            }
+        }
+        root.addView(voiceButton, LinearLayout.LayoutParams(-1, dp(54)).apply { bottomMargin = dp(9) })
+
         status = TextView(this).apply {
             text = "Preparando sua biblioteca..."
             textSize = 12f
@@ -191,18 +207,6 @@ class MainActivity : AppCompatActivity() {
         controls.addView(playPause, LinearLayout.LayoutParams(0, dp(46), 1.35f).apply { marginStart = dp(4); marginEnd = dp(4) })
         controls.addView(next, LinearLayout.LayoutParams(0, dp(46), 1f).apply { marginStart = dp(4) })
         root.addView(controls, LinearLayout.LayoutParams(-1, dp(50)).apply { bottomMargin = dp(7) })
-
-        voiceButton = makeButton("🎙  ATIVAR COMANDO DE VOZ")
-        voiceButton.setOnClickListener {
-            if (voiceEnabled) {
-                disableVoiceCommands()
-            } else if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) {
-                enableVoiceCommands()
-            } else {
-                microphonePermission.launch(Manifest.permission.RECORD_AUDIO)
-            }
-        }
-        root.addView(voiceButton, LinearLayout.LayoutParams(-1, dp(44)).apply { bottomMargin = dp(8) })
 
         previous.setOnClickListener {
             mediaController?.let { player -> if (player.hasPreviousMediaItem()) player.seekToPreviousMediaItem() }
