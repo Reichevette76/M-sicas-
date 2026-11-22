@@ -196,23 +196,56 @@ class MainActivity : AppCompatActivity() {
         nowPlaying.addView(currentTrack)
         root.addView(nowPlaying, LinearLayout.LayoutParams(-1, dp(78)).apply { bottomMargin = dp(10) })
 
+        // Controles em formato clássico de player: anterior, play/pause circular e próxima.
         val controls = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER
+            setPadding(dp(12), dp(2), dp(12), dp(2))
         }
-        val previous = makeButton("‹  ANTERIOR")
-        val playPause = makeButton("▶  TOCAR / PAUSAR")
-        val next = makeButton("PRÓXIMA  ›")
-        controls.addView(previous, LinearLayout.LayoutParams(0, dp(50), 1f).apply { marginEnd = dp(5) })
-        controls.addView(playPause, LinearLayout.LayoutParams(0, dp(50), 1.4f).apply { marginStart = dp(5); marginEnd = dp(5) })
-        controls.addView(next, LinearLayout.LayoutParams(0, dp(50), 1f).apply { marginStart = dp(5) })
-        root.addView(controls, LinearLayout.LayoutParams(-1, dp(54)).apply { bottomMargin = dp(9) })
+        fun transportButton(symbol: String, primary: Boolean): TextView = TextView(this).apply {
+            text = symbol
+            gravity = Gravity.CENTER
+            includeFontPadding = false
+            textSize = if (primary) 29f else 23f
+            setTextColor(if (primary) 0xFFFFFFFF.toInt() else 0xFFFFC94A.toInt())
+            background = android.graphics.drawable.GradientDrawable().apply {
+                shape = android.graphics.drawable.GradientDrawable.OVAL
+                setColor(if (primary) 0xFFE01927.toInt() else 0xFF202024.toInt())
+                setStroke(dp(1), if (primary) 0xFFFF5962.toInt() else 0xFF57402A.toInt())
+            }
+            elevation = dp(if (primary) 5 else 2).toFloat()
+            isClickable = true
+            isFocusable = true
+            contentDescription = when (symbol) {
+                "⏮" -> "Faixa anterior"
+                "⏭" -> "Próxima faixa"
+                "Ⅱ" -> "Pausar"
+                else -> "Reproduzir"
+            }
+        }
+        val previous = transportButton("⏮", false)
+        val playPause = transportButton("▶", true)
+        val next = transportButton("⏭", false)
+        controls.addView(previous, LinearLayout.LayoutParams(dp(54), dp(54)).apply { marginEnd = dp(30) })
+        controls.addView(playPause, LinearLayout.LayoutParams(dp(68), dp(68)))
+        controls.addView(next, LinearLayout.LayoutParams(dp(54), dp(54)).apply { marginStart = dp(30) })
+        root.addView(controls, LinearLayout.LayoutParams(-1, dp(76)).apply { bottomMargin = dp(9) })
 
         previous.setOnClickListener {
             mediaController?.let { player -> if (player.hasPreviousMediaItem()) player.seekToPreviousMediaItem() }
         }
         playPause.setOnClickListener {
-            mediaController?.let { player -> if (player.isPlaying) player.pause() else player.play() }
+            mediaController?.let { player ->
+                if (player.isPlaying) {
+                    player.pause()
+                    playPause.text = "▶"
+                    playPause.contentDescription = "Reproduzir"
+                } else {
+                    player.play()
+                    playPause.text = "Ⅱ"
+                    playPause.contentDescription = "Pausar"
+                }
+            }
         }
         next.setOnClickListener {
             mediaController?.let { player -> if (player.hasNextMediaItem()) player.seekToNextMediaItem() }
