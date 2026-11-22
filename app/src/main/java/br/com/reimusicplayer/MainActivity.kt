@@ -258,7 +258,7 @@ class MainActivity : AppCompatActivity() {
             mediaController?.let { player ->
                 if (player.isPlaying) {
                     player.pause()
-                    playPause.text = "⊙"
+                    playPause.text = "⏵"
                     playPause.contentDescription = "Reproduzir"
                 } else {
                     player.play()
