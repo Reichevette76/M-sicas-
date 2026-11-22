@@ -196,41 +196,61 @@ class MainActivity : AppCompatActivity() {
         nowPlaying.addView(currentTrack)
         root.addView(nowPlaying, LinearLayout.LayoutParams(-1, dp(78)).apply { bottomMargin = dp(10) })
 
-        // Controles em formato clássico de player: anterior, play/pause circular e próxima.
+        // Barra de transporte no estilo solicitado: aleatório, anterior, play, próxima e repetir.
         val controls = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER
-            setPadding(dp(12), dp(2), dp(12), dp(2))
+            setPadding(dp(8), dp(2), dp(8), dp(2))
         }
-        fun transportButton(symbol: String, primary: Boolean): TextView = TextView(this).apply {
+        fun transportButton(symbol: String, primary: Boolean = false): TextView = TextView(this).apply {
             text = symbol
             gravity = Gravity.CENTER
             includeFontPadding = false
-            textSize = if (primary) 29f else 23f
-            setTextColor(if (primary) 0xFFFFFFFF.toInt() else 0xFFFFC94A.toInt())
+            textSize = when {
+                primary -> 31f
+                symbol == "⤨" || symbol == "↻" -> 25f
+                else -> 23f
+            }
+            setTextColor(if (primary) 0xFFFFFFFF.toInt() else 0xFFF4F4F4.toInt())
             background = android.graphics.drawable.GradientDrawable().apply {
                 shape = android.graphics.drawable.GradientDrawable.OVAL
-                setColor(if (primary) 0xFFE01927.toInt() else 0xFF202024.toInt())
-                setStroke(dp(1), if (primary) 0xFFFF5962.toInt() else 0xFF57402A.toInt())
+                setColor(if (primary) 0xFFE01927.toInt() else android.graphics.Color.TRANSPARENT)
+                if (primary) setStroke(dp(1), 0xFFFF5962.toInt())
             }
-            elevation = dp(if (primary) 5 else 2).toFloat()
+            elevation = if (primary) dp(5).toFloat() else 0f
             isClickable = true
             isFocusable = true
-            contentDescription = when (symbol) {
-                "⏮" -> "Faixa anterior"
-                "⏭" -> "Próxima faixa"
-                "Ⅱ" -> "Pausar"
-                else -> "Reproduzir"
-            }
         }
-        val previous = transportButton("⏮", false)
-        val playPause = transportButton("▶", true)
-        val next = transportButton("⏭", false)
-        controls.addView(previous, LinearLayout.LayoutParams(dp(54), dp(54)).apply { marginEnd = dp(30) })
-        controls.addView(playPause, LinearLayout.LayoutParams(dp(68), dp(68)))
-        controls.addView(next, LinearLayout.LayoutParams(dp(54), dp(54)).apply { marginStart = dp(30) })
+        val shuffle = transportButton("⤨")
+        val previous = transportButton("⏮")
+        val playPause = transportButton("⊙")
+        val next = transportButton("⏭")
+        val repeat = transportButton("↻")
+        shuffle.contentDescription = "Ativar ou desativar reprodução aleatória"
+        previous.contentDescription = "Faixa anterior"
+        playPause.contentDescription = "Reproduzir"
+        next.contentDescription = "Próxima faixa"
+        repeat.contentDescription = "Ativar ou desativar repetição"
+        val sideParams = LinearLayout.LayoutParams(0, dp(48), 1f)
+        controls.addView(shuffle, LinearLayout.LayoutParams(0, dp(48), 0.8f))
+        controls.addView(previous, LinearLayout.LayoutParams(0, dp(48), 0.9f))
+        controls.addView(playPause, LinearLayout.LayoutParams(dp(68), dp(68)).apply {
+            marginStart = dp(5); marginEnd = dp(5)
+        })
+        controls.addView(next, LinearLayout.LayoutParams(0, dp(48), 0.9f))
+        controls.addView(repeat, LinearLayout.LayoutParams(0, dp(48), 0.8f))
         root.addView(controls, LinearLayout.LayoutParams(-1, dp(76)).apply { bottomMargin = dp(9) })
 
+        fun updateModeButton(button: TextView, enabled: Boolean) {
+            button.setTextColor(if (enabled) 0xFFFFC94A.toInt() else 0xFFBFC0C5.toInt())
+            button.alpha = if (enabled) 1f else 0.78f
+        }
+        shuffle.setOnClickListener {
+            mediaController?.let { player ->
+                player.shuffleModeEnabled = !player.shuffleModeEnabled
+                updateModeButton(shuffle, player.shuffleModeEnabled)
+            }
+        }
         previous.setOnClickListener {
             mediaController?.let { player -> if (player.hasPreviousMediaItem()) player.seekToPreviousMediaItem() }
         }
@@ -238,7 +258,7 @@ class MainActivity : AppCompatActivity() {
             mediaController?.let { player ->
                 if (player.isPlaying) {
                     player.pause()
-                    playPause.text = "▶"
+                    playPause.text = "⊙"
                     playPause.contentDescription = "Reproduzir"
                 } else {
                     player.play()
@@ -249,6 +269,14 @@ class MainActivity : AppCompatActivity() {
         }
         next.setOnClickListener {
             mediaController?.let { player -> if (player.hasNextMediaItem()) player.seekToNextMediaItem() }
+        }
+        repeat.setOnClickListener {
+            mediaController?.let { player ->
+                player.repeatMode = if (player.repeatMode == androidx.media3.common.Player.REPEAT_MODE_OFF)
+                    androidx.media3.common.Player.REPEAT_MODE_ALL
+                else androidx.media3.common.Player.REPEAT_MODE_OFF
+                updateModeButton(repeat, player.repeatMode != androidx.media3.common.Player.REPEAT_MODE_OFF)
+            }
         }
 
         val libraryHeader = LinearLayout(this).apply {
